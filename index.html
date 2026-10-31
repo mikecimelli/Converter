@@ -55,6 +55,13 @@ body {
 .rate { text-align: center; margin: 14px 0 4px; }
 .rate .main { font-size: 1.1rem; font-weight: 600; }
 .rate .sub { color: var(--muted); font-size: .78rem; margin-top: 3px; line-height: 1.35; }
+.bump { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 10px; }
+.bump button {
+  border: 0; border-radius: 14px; padding: 14px 0; background: var(--accent); color: var(--accent-ink);
+  font: inherit; font-size: 1.15rem; font-weight: 650; cursor: pointer;
+}
+.bump button:active { opacity: .7; }
+.bump .clear { background: var(--key); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
 .pad {
   flex: 1; min-height: 0; margin-top: 10px; display: grid;
   grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8px;
@@ -74,7 +81,7 @@ body {
   <button class="row active" id="row-GBP" data-cur="GBP" aria-label="Pounds">
     <span class="cur"><b>🇬🇧 GBP</b><small>Pounds</small></span><span class="amt" id="amt-GBP">0</span>
   </button>
-  <button class="swap" id="swap" aria-label="Swap direction">⇅</button>
+  <button class="swap" id="swap" aria-label="Move value to the other currency">⇅</button>
   <button class="row" id="row-EUR" data-cur="EUR" aria-label="Euros">
     <span class="cur"><b>🇪🇺 EUR</b><small>Euros</small></span><span class="amt" id="amt-EUR">0</span>
   </button>
@@ -83,6 +90,12 @@ body {
 <div class="rate">
   <div class="main" id="rate-main">Loading rate…</div>
   <div class="sub" id="rate-sub"></div>
+</div>
+
+<div class="bump" id="bump">
+  <button data-add="1">+1</button><button data-add="5">+5</button>
+  <button data-add="10">+10</button><button data-add="50">+50</button>
+  <button class="clear" data-k="clear" aria-label="Clear">C</button>
 </div>
 
 <div class="pad" id="pad">
@@ -139,20 +152,36 @@ body {
     render();
   }
 
+  // Tapping the other row just moves focus; its own value was derived from the focused one, so keep the typed figure.
   function setActive(cur) {
     if (cur === state.active) return;
-    // carry the converted figure across so swapping keeps the numbers on screen
     const val = parseFloat(state.input || '0');
     const factor = state.active === 'GBP' ? state.rate : 1 / state.rate;
-    const out = val * factor;
-    state.input = val ? String(Math.round(out * 100) / 100) : '';
+    state.input = val ? String(Math.round(val * factor * 100) / 100) : '';
     state.active = cur;
+    render();
+  }
+
+  // Swap: the number being edited moves to the other currency, which takes focus; the old field is recalculated.
+  function swap() {
+    state.active = state.active === 'GBP' ? 'EUR' : 'GBP';
+    render();
+  }
+
+  function bump(n) {
+    const v = Math.round((parseFloat(state.input || '0') + n) * 100) / 100;
+    state.input = v ? String(v) : '';
+    if (navigator.vibrate) navigator.vibrate(8);
     render();
   }
 
   $('pad').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) press(b.dataset.k); });
   document.querySelectorAll('.row').forEach((r) => r.addEventListener('click', () => setActive(r.dataset.cur)));
-  $('swap').addEventListener('click', () => setActive(state.active === 'GBP' ? 'EUR' : 'GBP'));
+  $('swap').addEventListener('click', swap);
+  $('bump').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.k === 'clear') { state.input = ''; render(); } else bump(Number(b.dataset.add));
+  });
   document.addEventListener('keydown', (e) => {
     if (/^[0-9.]$/.test(e.key)) press(e.key);
     else if (e.key === 'Backspace') press('back');
